@@ -4,9 +4,9 @@ output_dir: after
 screenshots:
   - file: welcome.png
     caption:
-      - Всё остаётся
-      - на вашем телефоне
+      - Everything stays
+      - on your phone
   - file: chat.png
     caption:
-      - Отправляйте сообщения
-      - быстрее всех
+      - Send messages
+      - faster than ever

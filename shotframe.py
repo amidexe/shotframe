@@ -2,52 +2,54 @@
 """shotframe — wrap phone screenshots in a polished canvas for app-store listings.
 
 Usage:
-    shotframe.py                       # read ./shotframe.yaml
-    shotframe.py path/to/config.yaml
-    shotframe.py --init                # scaffold shotframe.yaml
-    shotframe.py --interactive         # prompt for a caption per PNG in input_dir
+    shotframe.py                       # scan current dir, prompt for captions
+    shotframe.py path/to/folder        # scan that folder, prompt for captions
+    shotframe.py path/to/config.yaml   # render from a config
+    shotframe.py --init                # scaffold shotframe.yaml in current dir
 """
 import argparse
 import base64
 import glob
 import os
+import struct
 import subprocess
 import sys
 
 import yaml
 
 
+MAX_CAPTION_CHARS = 28
+
+
 DEFAULT_CONFIG = {
     "input_dir": ".",
     "output_dir": "processed",
-    "canvas": {
-        # Match phone aspect (9:20) so output keeps the input proportions.
-        "width": 1200,
-        "height": 2700,
-        "bg_top": "#F5F5F7",
-        "bg_bottom": "#E8E8EB",
+    "background": {
+        "top": "#F5F5F7",
+        "bottom": "#E8E8EB",
     },
-    "screenshot": {
-        "width": 918,
-        "height": 2060,
-        "y": 400,
-        "radius": 48,
-        "frame_color": "#FFFFFF",
+    "layout": {
+        # All ratios are relative to the input PNG's width.
+        "side_padding": 0.118,
+        "caption_height": 0.370,
+        "bottom_padding": 0.222,
+        "corner_radius": 0.044,
     },
     "caption": {
         "font_family": "'Inter Display', Inter, sans-serif",
-        "font_size": 88,
+        "font_size": 0.082,
         "font_weight": 800,
         "letter_spacing": -2.5,
         "color": "#14141A",
-        "line1_y": 210,
-        "line2_y": 305,
+        "line1_y": 0.194,
+        "line2_y": 0.282,
     },
     "shadow": {
-        "blur": 34,
-        "offset_y": 14,
+        "blur": 0.031,
+        "offset_y": 0.013,
         "opacity": 0.16,
     },
+    "frame_color": "#FFFFFF",
     "screenshots": [],
 }
 
@@ -97,23 +99,44 @@ SVG_TEMPLATE = """<?xml version="1.0" encoding="UTF-8"?>
 """
 
 
+def png_dimensions(path):
+    """Read width/height from a PNG header without decoding the image."""
+    with open(path, "rb") as f:
+        header = f.read(24)
+    if header[:8] != b"\x89PNG\r\n\x1a\n":
+        raise ValueError(f"not a PNG: {path}")
+    w, h = struct.unpack(">II", header[16:24])
+    return w, h
+
+
+def normalize_caption(caption):
+    if isinstance(caption, str):
+        caption = [caption]
+    return [str(line) for line in caption[:2]]
+
+
 def render(cfg, entries, base_dir):
     in_dir = os.path.join(base_dir, cfg["input_dir"])
     out_dir = os.path.join(base_dir, cfg["output_dir"])
     os.makedirs(out_dir, exist_ok=True)
 
-    c = cfg["canvas"]
-    s = cfg["screenshot"]
-    t = cfg["caption"]
-    sh = cfg["shadow"]
-
-    shot_x = (c["width"] - s["width"]) // 2
+    bg = cfg["background"]
+    L = cfg["layout"]
+    T = cfg["caption"]
+    SH = cfg["shadow"]
 
     for entry in entries:
         fname = entry["file"]
-        caption = entry.get("caption", [])
-        if isinstance(caption, str):
-            caption = [caption]
+        caption = normalize_caption(entry.get("caption", []))
+
+        too_long = [(i + 1, len(c)) for i, c in enumerate(caption)
+                    if len(c) > MAX_CAPTION_CHARS]
+        if too_long:
+            for ln, length in too_long:
+                print(f"skip {fname}: line {ln} is {length} chars, "
+                      f"max is {MAX_CAPTION_CHARS}", file=sys.stderr)
+            continue
+
         l1 = caption[0] if len(caption) > 0 else ""
         l2 = caption[1] if len(caption) > 1 else ""
 
@@ -122,19 +145,37 @@ def render(cfg, entries, base_dir):
             print(f"skip missing: {fname}", file=sys.stderr)
             continue
 
+        in_w, in_h = png_dimensions(src)
+
+        side = round(in_w * L["side_padding"])
+        cap_h = round(in_w * L["caption_height"])
+        bot = round(in_w * L["bottom_padding"])
+        canvas_w = in_w + 2 * side
+        canvas_h = cap_h + in_h + bot
+        shot_x = side
+        shot_y = cap_h
+        radius = round(in_w * L["corner_radius"])
+
+        font_size = round(in_w * T["font_size"])
+        l1y = round(in_w * T["line1_y"])
+        l2y = round(in_w * T["line2_y"])
+
+        shadow_blur = round(in_w * SH["blur"])
+        shadow_dy = round(in_w * SH["offset_y"])
+
         with open(src, "rb") as f:
             b64 = base64.b64encode(f.read()).decode("ascii")
 
         svg = SVG_TEMPLATE.format(
-            W=c["width"], H=c["height"], W_HALF=c["width"] // 2,
-            BG_TOP=c["bg_top"], BG_BOTTOM=c["bg_bottom"],
-            SX=shot_x, SY=s["y"], SW=s["width"], SH=s["height"],
-            R=s["radius"], FRAME_COLOR=s["frame_color"],
-            SHADOW_BLUR=sh["blur"], SHADOW_DY=sh["offset_y"],
-            SHADOW_OPACITY=sh["opacity"],
-            FONT_FAMILY=t["font_family"], FONT_SIZE=t["font_size"],
-            FONT_WEIGHT=t["font_weight"], LETTER_SPACING=t["letter_spacing"],
-            TEXT_COLOR=t["color"], L1Y=t["line1_y"], L2Y=t["line2_y"],
+            W=canvas_w, H=canvas_h, W_HALF=canvas_w // 2,
+            BG_TOP=bg["top"], BG_BOTTOM=bg["bottom"],
+            SX=shot_x, SY=shot_y, SW=in_w, SH=in_h,
+            R=radius, FRAME_COLOR=cfg["frame_color"],
+            SHADOW_BLUR=shadow_blur, SHADOW_DY=shadow_dy,
+            SHADOW_OPACITY=SH["opacity"],
+            FONT_FAMILY=T["font_family"], FONT_SIZE=font_size,
+            FONT_WEIGHT=T["font_weight"], LETTER_SPACING=T["letter_spacing"],
+            TEXT_COLOR=T["color"], L1Y=l1y, L2Y=l2y,
             B64=b64, L1=l1, L2=l2,
         )
 
@@ -145,7 +186,7 @@ def render(cfg, entries, base_dir):
 
         subprocess.run(["rsvg-convert", "-o", out_png, svg_tmp], check=True)
         os.remove(svg_tmp)
-        print(f"ok: {fname}")
+        print(f"ok: {fname} ({in_w}x{in_h} -> {canvas_w}x{canvas_h})")
 
 
 def interactive_collect(cfg, base_dir):
@@ -158,8 +199,9 @@ def interactive_collect(cfg, base_dir):
     entries = []
     for path in pngs:
         fname = os.path.basename(path)
-        print(f"\n📸 {fname}")
-        print("  Caption — up to 2 lines, empty line to finish, 'skip' to skip:")
+        print(f"\n{fname}")
+        print(f"  Caption — up to 2 lines, max {MAX_CAPTION_CHARS} chars each.")
+        print("  Empty line to finish, 'skip' to drop this screenshot.")
         lines = []
         while len(lines) < 2:
             line = input(f"  {len(lines) + 1}> ").strip()
@@ -168,6 +210,10 @@ def interactive_collect(cfg, base_dir):
                 break
             if not line:
                 break
+            if len(line) > MAX_CAPTION_CHARS:
+                print(f"  too long ({len(line)} chars, max {MAX_CAPTION_CHARS}) "
+                      f"— try again")
+                continue
             lines.append(line)
         if lines is None:
             continue
@@ -179,7 +225,8 @@ def write_default_config(path):
     if os.path.exists(path):
         print(f"refuse to overwrite existing {path}", file=sys.stderr)
         sys.exit(1)
-    sample = dict(DEFAULT_CONFIG)
+    sample = {k: dict(v) if isinstance(v, dict) else v
+              for k, v in DEFAULT_CONFIG.items()}
     sample["screenshots"] = [
         {"file": "01-welcome.png", "caption": ["Line one", "Line two"]},
         {"file": "02-feature.png", "caption": "Single-line caption"},
@@ -200,40 +247,52 @@ def merge_config(user_cfg):
     return merged
 
 
+def run_folder(folder):
+    cfg = merge_config({})
+    cfg["input_dir"] = "."
+    base_dir = os.path.abspath(folder)
+    entries = interactive_collect(cfg, base_dir)
+    if entries:
+        render(cfg, entries, base_dir)
+
+
+def run_config(config_path):
+    with open(config_path) as f:
+        user_cfg = yaml.safe_load(f) or {}
+    cfg = merge_config(user_cfg)
+    base_dir = os.path.dirname(os.path.abspath(config_path)) or "."
+    entries = cfg.get("screenshots", [])
+    if not entries:
+        entries = interactive_collect(cfg, base_dir)
+        if not entries:
+            return
+    render(cfg, entries, base_dir)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    p.add_argument("config", nargs="?", default="shotframe.yaml",
-                   help="path to config (default: shotframe.yaml)")
+    p.add_argument("path", nargs="?", default=".",
+                   help="folder with PNGs, or path to a config YAML (default: .)")
     p.add_argument("--init", action="store_true",
                    help="write a starter shotframe.yaml in the current dir")
-    p.add_argument("--interactive", action="store_true",
-                   help="prompt for captions instead of reading the config list")
     args = p.parse_args()
 
     if args.init:
         write_default_config("shotframe.yaml")
         return
 
-    if not os.path.exists(args.config):
-        print(f"no config: {args.config} (try --init)", file=sys.stderr)
+    if not os.path.exists(args.path):
+        print(f"no such path: {args.path}", file=sys.stderr)
         sys.exit(1)
 
-    with open(args.config) as f:
-        user_cfg = yaml.safe_load(f) or {}
-
-    cfg = merge_config(user_cfg)
-    base_dir = os.path.dirname(os.path.abspath(args.config)) or "."
-
-    if args.interactive:
-        entries = interactive_collect(cfg, base_dir)
+    if os.path.isdir(args.path):
+        auto_yaml = os.path.join(args.path, "shotframe.yaml")
+        if os.path.exists(auto_yaml):
+            run_config(auto_yaml)
+        else:
+            run_folder(args.path)
     else:
-        entries = cfg.get("screenshots", [])
-        if not entries:
-            print("config has no 'screenshots:' list; use --interactive",
-                  file=sys.stderr)
-            sys.exit(1)
-
-    render(cfg, entries, base_dir)
+        run_config(args.path)
 
 
 if __name__ == "__main__":

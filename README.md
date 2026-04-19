@@ -1,7 +1,7 @@
 # shotframe
 
 Wrap raw phone screenshots in a polished canvas for app-store listings.
-One YAML config, one Python script, one command — no design tool required.
+One Python script, one command — no design tool required.
 
 <p align="center">
   <img src="examples/before/welcome.png" alt="raw screenshot"    width="260">
@@ -14,8 +14,13 @@ One YAML config, one Python script, one command — no design tool required.
 Takes a folder of phone screenshots, adds a neutral-grey backdrop, a bold
 two-line headline on top, soft drop shadow and rounded corners around the
 device screen, and renders polished PNGs ready for RuStore, Google Play,
-or App Store listings. All text is rendered via SVG and `rsvg-convert`,
-so Cyrillic (and anything else `fontconfig` can find) is first-class.
+or App Store listings.
+
+Output dimensions are derived from each input PNG, so you can drop in
+screenshots of any resolution — 1080×2400, 1440×3120, anything else —
+and the layout scales accordingly. All text is rendered via SVG and
+`rsvg-convert`, so Cyrillic (and anything else `fontconfig` can find)
+is first-class.
 
 ## Requirements
 
@@ -36,7 +41,29 @@ pip install -r requirements.txt   # just PyYAML
 
 There is no package yet — call `shotframe.py` directly.
 
-## Quick start
+## Just point it at a folder
+
+The simplest workflow: drop your raw screenshots in a folder and run
+
+```bash
+python shotframe.py path/to/folder
+```
+
+shotframe walks every PNG in the folder, prompts you for a caption
+(up to two lines, max 28 characters per line), and writes polished
+PNGs into `path/to/folder/processed/`. No config file required.
+
+Run with no arguments to do the same in the current directory:
+
+```bash
+cd my-screenshots
+python shotframe.py
+```
+
+Type `skip` at any prompt to drop a screenshot. An empty line ends
+the caption (you can use one line or two).
+
+## Quick start with the bundled example
 
 ```bash
 cd examples
@@ -44,27 +71,19 @@ python ../shotframe.py shotframe.yaml
 # polished PNGs appear in ./after/
 ```
 
-## Your own project
+## Config-driven mode
 
-Put your phone screenshots in a folder, then:
+For repeatable runs (or when you want the captions checked into git),
+use a YAML config:
 
 ```bash
-python shotframe.py --init              # writes shotframe.yaml next to your config
+python shotframe.py --init        # writes shotframe.yaml in the current dir
 # edit shotframe.yaml — set input_dir / output_dir / screenshots
 python shotframe.py shotframe.yaml
 ```
 
-## Interactive mode
-
-Don't want to hand-edit YAML? Point `input_dir` at your screenshots and run:
-
-```bash
-python shotframe.py shotframe.yaml --interactive
-```
-
-The script walks through every PNG in `input_dir` and prompts you for a
-caption (up to two lines; empty line ends the caption; `skip` drops the
-screenshot). Rendering happens right after.
+If you pass a folder path that contains a `shotframe.yaml`, it gets
+picked up automatically.
 
 ## Config
 
@@ -72,32 +91,33 @@ screenshot). Rendering happens right after.
 input_dir: before        # folder with raw screenshots
 output_dir: after        # where polished PNGs go
 
-canvas:
-  width: 1200            # matches phone aspect (9:20), so output keeps input proportions
-  height: 2700
-  bg_top: "#F5F5F7"
-  bg_bottom: "#E8E8EB"
+background:
+  top: "#F5F5F7"
+  bottom: "#E8E8EB"
 
-screenshot:
-  width: 918             # rendered size of the device screen inside the canvas
-  height: 2060
-  y: 400                 # vertical offset from the top of the canvas
-  radius: 48             # corner radius
-  frame_color: "#FFFFFF" # visible only around fully-transparent screenshots
+# All layout values are ratios relative to the input PNG's width,
+# so the output scales with whatever resolution you feed in.
+layout:
+  side_padding: 0.118    # horizontal margin on each side of the screenshot
+  caption_height: 0.370  # vertical strip above the screenshot for the caption
+  bottom_padding: 0.222  # vertical space below the screenshot
+  corner_radius: 0.044   # rounded corners on the screenshot
 
 caption:
   font_family: "'Inter Display', Inter, sans-serif"
-  font_size: 88
+  font_size: 0.082       # ratio of input width
   font_weight: 800
   letter_spacing: -2.5
   color: "#14141A"
-  line1_y: 210           # y of the first caption line (SVG baseline)
-  line2_y: 305
+  line1_y: 0.194         # baseline of the first line, ratio of input width
+  line2_y: 0.282
 
 shadow:
-  blur: 34
-  offset_y: 14
+  blur: 0.031
+  offset_y: 0.013
   opacity: 0.16
+
+frame_color: "#FFFFFF"   # visible only around fully-transparent screenshots
 
 screenshots:
   - file: 01-welcome.png
@@ -111,10 +131,17 @@ screenshots:
 Every top-level section is optional — missing keys fall back to sensible
 defaults matching the example above.
 
+## Caption length
+
+Captions are capped at 28 characters per line. In interactive mode an
+over-long entry is rejected on the spot with a "try again" prompt. In
+config-driven mode, screenshots with over-long captions are skipped
+with a warning on stderr — shotframe never silently truncates.
+
 ## Why
 
 Most store-listing tools are heavy (Figma templates, paid mockup generators,
-proprietary SaaS). `shotframe` is ~250 lines of Python that you read in one
+proprietary SaaS). `shotframe` is a single Python file you read in one
 sitting, keep in your repo, and wire into CI if you feel like it.
 
 ## License
