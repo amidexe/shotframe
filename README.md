@@ -3,7 +3,11 @@
 Wrap raw phone screenshots in a polished canvas for app-store listings.
 One YAML config, one Python script, one command — no design tool required.
 
-![before and after](https://raw.githubusercontent.com/amidexe/shotframe/main/examples/after/welcome.png)
+<p align="center">
+  <img src="examples/before/welcome.png" alt="raw screenshot"    width="260">
+  &nbsp;&nbsp;→&nbsp;&nbsp;
+  <img src="examples/after/welcome.png"  alt="polished output"   width="260">
+</p>
 
 ## What it does
 
