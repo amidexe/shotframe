@@ -21,15 +21,16 @@ DEFAULT_CONFIG = {
     "input_dir": ".",
     "output_dir": "processed",
     "canvas": {
+        # Match phone aspect (9:20) so output keeps the input proportions.
         "width": 1200,
-        "height": 2500,
+        "height": 2700,
         "bg_top": "#F5F5F7",
         "bg_bottom": "#E8E8EB",
     },
     "screenshot": {
         "width": 918,
         "height": 2060,
-        "y": 360,
+        "y": 400,
         "radius": 48,
         "frame_color": "#FFFFFF",
     },

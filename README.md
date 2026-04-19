@@ -73,15 +73,15 @@ input_dir: before        # folder with raw screenshots
 output_dir: after        # where polished PNGs go
 
 canvas:
-  width: 1200
-  height: 2500
+  width: 1200            # matches phone aspect (9:20), so output keeps input proportions
+  height: 2700
   bg_top: "#F5F5F7"
   bg_bottom: "#E8E8EB"
 
 screenshot:
   width: 918             # rendered size of the device screen inside the canvas
   height: 2060
-  y: 360                 # vertical offset from the top of the canvas
+  y: 400                 # vertical offset from the top of the canvas
   radius: 48             # corner radius
   frame_color: "#FFFFFF" # visible only around fully-transparent screenshots
 
