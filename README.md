@@ -6,21 +6,28 @@ One Python script, one command — no design tool required.
 <p align="center">
   <img src="examples/before/welcome.png" alt="raw screenshot"    width="260">
   &nbsp;&nbsp;→&nbsp;&nbsp;
-  <img src="examples/after/welcome.png"  alt="polished output"   width="260">
+  <img src="examples/after/welcome.png"  alt="polished portrait output"   width="260">
+</p>
+
+<p align="center">
+  <img src="examples/after-16x9/welcome.png" alt="polished 16:9 landscape output" width="560">
 </p>
 
 ## What it does
 
 Takes a folder of phone screenshots, adds a neutral-grey backdrop, a bold
-two-line headline on top, soft drop shadow and rounded corners around the
-device screen, and renders polished PNGs ready for RuStore, Google Play,
-or App Store listings.
+headline, soft drop shadow and rounded corners around the device screen,
+and renders polished PNGs ready for RuStore, Google Play, or App Store
+listings. Two layouts are built-in:
 
-Output dimensions are derived from each input PNG, so you can drop in
-screenshots of any resolution — 1080×2400, 1440×3120, anything else —
-and the layout scales accordingly. All text is rendered via SVG and
-`rsvg-convert`, so Cyrillic (and anything else `fontconfig` can find)
-is first-class.
+- **Portrait** (default) — caption on top, screenshot below; canvas derived
+  from each input PNG so it scales to whatever resolution you feed in.
+- **Landscape 16:9** (`layout_mode: landscape_16_9`) — 1920×1080 canvas with
+  the phone on the right and the caption centered on the left. Ready to
+  upload to stores that expect 16:9 feature graphics, RuStore in particular.
+
+All text is rendered via SVG and `rsvg-convert`, so Cyrillic (and anything
+else `fontconfig` can find) is first-class.
 
 ## Requirements
 
@@ -69,6 +76,10 @@ the caption (you can use one line or two).
 cd examples
 python ../shotframe.py shotframe.yaml
 # polished PNGs appear in ./after/
+
+# or render the 16:9 landscape variant:
+python ../shotframe.py shotframe-landscape.yaml
+# polished PNGs appear in ./after-16x9/
 ```
 
 ## Config-driven mode
@@ -130,6 +141,42 @@ screenshots:
 
 Every top-level section is optional — missing keys fall back to sensible
 defaults matching the example above.
+
+### Landscape 16:9 mode (RuStore-ready)
+
+RuStore and some other stores expect 16:9 feature graphics for phone
+screenshots. Flip the layout by adding `layout_mode: landscape_16_9`:
+
+```yaml
+input_dir: before
+output_dir: after-16x9
+layout_mode: landscape_16_9
+
+# Optional overrides; every key falls back to the defaults shown below.
+landscape:
+  canvas_width: 1920
+  canvas_height: 1080
+  phone_margin_v: 60        # top/bottom padding around the phone
+  phone_margin_right: 140   # distance from the phone to the right edge
+  text_margin_left: 140     # distance from the text to the left edge
+  font_family: "'Inter Display', Inter, sans-serif"
+  font_size: 72
+  font_weight: 800
+  letter_spacing: -2.5
+  line_height: 1.15
+  color: "#14141A"
+  corner_radius: 48
+
+screenshots:
+  - file: welcome.png
+    caption:
+      - Everything stays
+      - on your phone
+```
+
+The phone is scaled to fit the canvas height minus the vertical margins;
+the caption is left-aligned and vertically centered in the remaining
+space on the left.
 
 ## Caption length
 

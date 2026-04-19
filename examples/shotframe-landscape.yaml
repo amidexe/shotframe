@@ -1,0 +1,13 @@
+input_dir: before
+output_dir: after-16x9
+layout_mode: landscape_16_9
+
+screenshots:
+  - file: welcome.png
+    caption:
+      - Everything stays
+      - on your phone
+  - file: chat.png
+    caption:
+      - Send messages
+      - faster than ever
