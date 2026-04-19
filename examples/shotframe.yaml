@@ -1,0 +1,12 @@
+input_dir: before
+output_dir: after
+
+screenshots:
+  - file: welcome.png
+    caption:
+      - Всё остаётся
+      - на вашем телефоне
+  - file: chat.png
+    caption:
+      - Отправляйте сообщения
+      - быстрее всех
